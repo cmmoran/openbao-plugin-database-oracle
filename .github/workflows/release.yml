@@ -1,0 +1,52 @@
+name: release
+on: [push,pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Cache modules & run tests
+        uses: magnetikonline/action-golang-cache@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download deps & run tests
+        run: |
+          go mod download
+          go test ./...
+
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Conventional Changelog Action
+        id: changelog
+        uses: TriPSs/conventional-changelog-action@v6.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          git-branch: main
+          version-file: version.yml
+          git-user-name: Release [Bot]
+          output-file: CHANGELOG.md
+          release-count: 0
+          fallback-version: '0.1.0'
+
+      - name: Release
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.changelog.outputs.tag }}
+          name: ${{ steps.changelog.outputs.tag }}
+          body: ${{ steps.changelog.outputs.clean_changelog }}
